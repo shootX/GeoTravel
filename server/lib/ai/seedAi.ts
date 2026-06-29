@@ -14,7 +14,9 @@ export async function seedAiDefaults(): Promise<void> {
         name: providerDef.name,
         sortOrder: providerDef.sortOrder,
         baseUrl: providerDef.defaultBaseUrl ?? null,
-        ...(envKey && !process.env.FORCE_DB_AI_KEYS ? {} : {}),
+        ...(envKey && !process.env.FORCE_DB_AI_KEYS
+          ? { apiKey: envKey, isActive: true }
+          : {}),
       },
       create: {
         slug: providerDef.slug,
