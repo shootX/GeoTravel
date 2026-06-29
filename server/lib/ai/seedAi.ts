@@ -26,13 +26,6 @@ export async function seedAiDefaults(): Promise<void> {
       },
     });
 
-    if (envKey && !provider.apiKey) {
-      await prisma.aiProvider.update({
-        where: { id: provider.id },
-        data: { apiKey: envKey, isActive: true },
-      });
-    }
-
     for (const modelDef of providerDef.models) {
       if (modelDef.isDefault) {
         await prisma.aiModel.updateMany({
