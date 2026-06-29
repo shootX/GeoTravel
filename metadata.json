@@ -1,0 +1,6 @@
+{
+  "name": "AI Travel Planner",
+  "description": "A lightweight travel planner MVP that generates optimized daily itineraries for tourists in any city.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
