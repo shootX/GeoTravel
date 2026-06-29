@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String?  @map("password_hash")
+  name          String?
+  avatarUrl     String?  @map("avatar_url")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  role          String   @default("USER")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  oauthAccounts OAuthAccount[]
+  refreshTokens RefreshToken[]
+  savedPlans    SavedPlan[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  provider       String
+  providerUserId String   @map("provider_user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model SavedPlan {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  plan      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_plans")
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  places   Place[]
+  packages TravelPackage[]
+
+  @@map("countries")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  places Place[]
+
+  @@map("categories")
+}
+
+model Place {
+  id                   String   @id
+  name                 String
+  city                 String
+  countryId            String   @map("country_id")
+  categoryId           String   @map("category_id")
+  lat                  Float
+  lng                  Float
+  description          String   @default("")
+  shortDescription     String   @default("") @map("short_description")
+  fullDescription      String   @default("") @map("full_description")
+  localTips            String   @default("") @map("local_tips")
+  avgVisitTime         Int      @default(60) @map("avg_visit_time")
+  averageVisitDuration Int      @default(60) @map("average_visit_duration")
+  bestVisitTime        String   @default("Morning") @map("best_visit_time")
+  openingHours         String   @default("09:00–18:00") @map("opening_hours")
+  ticketPrice          String   @default("Free") @map("ticket_price")
+  indoor               Boolean  @default(false)
+  outdoor              Boolean  @default(true)
+  rainFriendly         Boolean  @default(true) @map("rain_friendly")
+  photoScore           Int      @default(7) @map("photo_score")
+  popularityScore      Int      @default(7) @map("popularity_score")
+  experienceScore      Int      @default(7) @map("experience_score")
+  familyFriendly       Boolean  @default(true) @map("family_friendly")
+  accessibility        String   @default("Partial — check local conditions")
+  tags                 String   @default("[]")
+  isPublished          Boolean  @default(true) @map("is_published")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  country      Country            @relation(fields: [countryId], references: [id])
+  category     Category           @relation(fields: [categoryId], references: [id])
+  translations PlaceTranslation[]
+  hiddenGem    HiddenGemProfile?
+
+  @@index([city])
+  @@index([isPublished])
+  @@map("places")
+}
+
+model PlaceTranslation {
+  id               String   @id @default(cuid())
+  placeId          String   @map("place_id")
+  locale           String
+  name             String?
+  shortDescription String?  @map("short_description")
+  fullDescription  String?  @map("full_description")
+  localTips        String?  @map("local_tips")
+  storyContent     String?  @map("story_content")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([placeId, locale])
+  @@map("place_translations")
+}
+
+model HiddenGemProfile {
+  id                 String   @id @default(cuid())
+  placeId            String   @unique @map("place_id")
+  hiddenGemScore     Int      @default(5) @map("hidden_gem_score")
+  touristScore       Int      @default(5) @map("tourist_score")
+  localFavoriteScore Int      @default(5) @map("local_favorite_score")
+  isHiddenGem        Boolean  @default(false) @map("is_hidden_gem")
+  editorNotes        String?  @map("editor_notes")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@map("hidden_gem_profiles")
+}
+
+model RouteTemplate {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  city         String
+  countryId    String?  @map("country_id")
+  description  String?
+  transport    String   @default("walk")
+  timeLimit    String   @default("4h") @map("time_limit")
+  interests    String   @default("[\"mixed\"]")
+  stopPlaceIds String   @default("[]") @map("stop_place_ids")
+  isPublished  Boolean  @default(false) @map("is_published")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([city])
+  @@map("route_templates")
+}
+
+model AiProvider {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  apiKey    String?  @map("api_key")
+  baseUrl   String?  @map("base_url")
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  models AiModel[]
+
+  @@map("ai_providers")
+}
+
+model AiModel {
+  id          String  @id @default(cuid())
+  providerId  String  @map("provider_id")
+  modelId     String  @map("model_id")
+  displayName String  @map("display_name")
+  isActive    Boolean @default(true) @map("is_active")
+  isDefault   Boolean @default(false) @map("is_default")
+  temperature Float   @default(0.9)
+  maxTokens   Int     @default(4096) @map("max_tokens")
+  sortOrder   Int     @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, modelId])
+  @@map("ai_models")
+}
+
+model AiPlannerSettings {
+  id               String  @id @default("default")
+  enabled          Boolean @default(true)
+  fallbackToGreedy Boolean @default(true) @map("fallback_to_greedy")
+  rotateModels     Boolean @default(true) @map("rotate_models")
+  systemPrompt     String? @map("system_prompt")
+  varietyBoost     Float   @default(0.9) @map("variety_boost")
+  preferredModelId String? @map("preferred_model_id")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_planner_settings")
+}
+
+model TravelPackage {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String?
+  city             String?
+  countryId        String?  @map("country_id")
+  price            Float?
+  currency         String   @default("USD")
+  durationDays     Int      @default(1) @map("duration_days")
+  routeTemplateIds String   @default("[]") @map("route_template_ids")
+  highlights       String?
+  isPublished      Boolean  @default(false) @map("is_published")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  country Country? @relation(fields: [countryId], references: [id])
+
+  @@map("travel_packages")
+}

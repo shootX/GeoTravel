@@ -1,37 +1,70 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl: string | null;
+  role?: "admin" | "user";
+}
+
+export type WeatherScenario = "clear" | "cloudy" | "light-rain" | "heavy-rain";
+
 export interface TravelPreferences {
   city: string;
-  timeLimit: string; // '2h' | '4h' | '6h' | '1day'
-  transport: 'walk' | 'car' | 'mixed';
-  interests: string[]; // e.g., ['history', 'nature', 'food', 'mixed']
+  timeLimit: string;
+  transport: "walk" | "car" | "mixed";
+  interests: string[];
+  /** Optional mock weather override — omitted in normal client requests. */
+  weatherScenario?: WeatherScenario;
 }
 
-export interface MapPin {
-  id: string;
+export interface PlanDaylight {
+  sunrise: string;
+  sunset: string;
+  summary: string;
+  simulated: boolean;
+}
+
+export interface PlanWeather {
+  condition: string;
+  precipitation: string;
+  temperatureC: number;
+  summary: string;
+  simulated: boolean;
+}
+
+export interface PlanStop {
   name: string;
+  category: string;
   lat: number;
   lng: number;
-  label: string; // "1", "2", "3" etc.
-  timeSpent: string;
+  duration: number;
+  startTime: string;
+  /** Short summary — unchanged for existing UI. */
   description: string;
+  /** Rich narrative for Story Mode; optional for backward-compatible API responses. */
+  fullDescription?: string;
+  /** Local insider tip for Story Mode. */
+  localTips?: string;
+  /** Daylight optimizer note — e.g. golden hour timing. */
+  timeOfDayNote?: string;
 }
 
-export interface ItineraryItem {
-  time: string; // e.g. "10:00"
-  placeName: string;
-  description: string;
-  timeSpent: string; // e.g. "1.5h" or "45m"
-  activityType: string; // e.g. "history" | "nature" | "food" | "general"
-  tips?: string;
-}
-
-export interface GeneratedPlan {
-  city: string;
-  timeLimit: string;
-  transport: string;
-  interests: string[];
+export interface TravelPlan {
   title: string;
-  description: string;
-  pins: MapPin[];
-  itinerary: ItineraryItem[];
-  center: [number, number]; // [lat, lng] for centering the map
+  city: string;
+  totalTime: number;
+  center: { lat: number; lng: number };
+  stops: PlanStop[];
+  routeSummary: string;
+  /** Present when weather-aware routing was applied. */
+  weather?: PlanWeather;
+  /** Present when daylight optimization was applied. */
+  daylight?: PlanDaylight;
+  /** Present when AI route planning was used. */
+  ai?: {
+    provider: string;
+    model: string;
+    modelId: string;
+    theme?: string;
+  };
 }
