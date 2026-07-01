@@ -31,9 +31,9 @@ function createMarkerElement(index: number, isActive: boolean): HTMLButtonElemen
     font-weight: 700;
     cursor: pointer;
     border: ${isActive ? "none" : "1px solid #E5E7EB"};
-    background: ${isActive ? "#2563EB" : "#FFFFFF"};
+    background: ${isActive ? "#0B4A46" : "#FFFFFF"};
     color: ${isActive ? "#FFFFFF" : "#374151"};
-    box-shadow: ${isActive ? "0 4px 14px rgba(37,99,235,0.35)" : "0 2px 8px rgba(0,0,0,0.12)"};
+    box-shadow: ${isActive ? "0 4px 14px rgba(11,74,70,0.35)" : "0 2px 8px rgba(0,0,0,0.12)"};
     transition: all 0.2s ease;
   `;
   return el;
@@ -116,7 +116,7 @@ export default function RouteMap({ plan, selectedStopIndex, onStopSelect }: Rout
             source: "route",
             layout: { "line-join": "round", "line-cap": "round" },
             paint: {
-              "line-color": "#2563EB",
+              "line-color": "#0B4A46",
               "line-width": 4,
               "line-opacity": 0.85,
               "line-dasharray": [2, 1],

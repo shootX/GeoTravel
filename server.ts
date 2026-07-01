@@ -8,6 +8,7 @@ import { validatePlanRequest } from "./server/lib/routeEngine";
 import { generatePlanAsync } from "./server/lib/planService";
 import authRouter from "./server/routes/auth";
 import adminRouter from "./server/routes/admin";
+import publicRouter from "./server/routes/public";
 import { optionalAuth, requireAuth, requireCsrf } from "./server/lib/auth/middleware";
 import { initializeCmsData } from "./server/lib/cms/initializeCms";
 
@@ -37,6 +38,7 @@ async function startServer() {
 
   app.use("/api/auth", authRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/public", publicRouter);
 
   app.post("/api/plan", requireAuth, requireCsrf, async (req, res) => {
     const request = validatePlanRequest(req.body);

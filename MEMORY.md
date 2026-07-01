@@ -32,133 +32,146 @@
 
 ### 1. აპლიკაციის ნაკადი (App Flow)
 
-აპი 4 ეკრანს შორის მოძრაობს: `landing` → `input` → `loading` → `results`
+აპი GEOTRAVEL საჯარო საიტია `react-router-dom`-ით + AI მარშრუტის გენერატორი მთავარ გვერდზე.
 
 | ეტაპი | კომპონენტი | აღწერა |
 |-------|-----------|--------|
-| `landing` | `LandingPage` | მთავარი გვერდი, CTA ღილაკით |
-| `input` | `InputScreen` | მომხმარებლის პარამეტრების შეყვანა |
+| `landing` | `LandingPage` | Hero, ძებნის პანელი, destinations, newsletter |
 | `loading` | `LoadingScreen` | API მოთხოვნის დროს ანიმაცია |
 | `results` | `ResultsPage` | გენერირებული მარშრუტის ჩვენება |
 
+**საჯარო გვერდები (`/` გარდა):**
+| Route | კომპონენტი |
+|-------|-----------|
+| `/destinations` | `PublicDestinationsPage` |
+| `/destinations/:id` | `PublicDestinationDetailPage` |
+| `/experiences` | `PublicExperiencesPage` |
+| `/custom-routes` | `PublicCustomRoutesPage` |
+| `/blog` | `PublicBlogPage` |
+| `/blog/:slug` | `PublicBlogPostPage` |
+| `/about` | `PublicAboutPage` |
+| `/admin/*` | `AdminApp` (CMS) |
+
 **მთავარი state (`App.tsx`):**
-- `step` — მიმდინარე ეკრანი
+- `step` — მიმდინარე ეკრანი (მხოლოდ `/`-ზე)
 - `preferences` — ქალაქი, დრო, ტრანსპორტი, ინტერესები
 - `generatedPlan` — ბექენდიდან მიღებული გეგმა
-- `history` — ბოლო 5 გეგმა (localStorage: `travel_planner_history`)
+- `history` — ბოლო 5 გეგმა (localStorage: `travel_planner_history_{userId}`)
+- `planError` — გეგმის გენერაციის შეცდომის ტექსტი
+- `sessionStorage` — `geotravel_plan_state` (step + plan + prefs — გვერდებს შორის ნავიგაციაზე არ იკარგება)
 
 **გეგმის გენერაციის ლოგიკა (`handlePreferencesSubmit`):**
-1. `step` → `loading`
-2. `POST /api/plan` — preferences JSON-ით
-3. წარმატებისას → `results`, გეგმა ისტორიაში (max 5)
-4. შეცდომისას → უკან `input`-ზე
+1. auth შემოწმება — ულოგინოს → AuthModal
+2. `step` → `loading`, `navigate("/")`
+3. `POST /api/plan` — preferences JSON-ით (~15–45 წმ)
+4. წარმატებისას → `results`, გეგმა ისტორიაში (max 5)
+5. შეცდომისას → `landing` + `planError` banner
+
+**წაშლილი:** `InputScreen` — ძებნა პირდაპირ `LandingPage`-ზეა
 
 ---
 
-### 2. Header (ყველა ეკრანზე)
+### 2. Header & Footer
 
-| ელემენტი | ID | ლოკაცია | ფუნქცია |
-|----------|-----|---------|---------|
-| **Compass ლოგო** | — | მარცხენა | `step` → `landing` (მთავარ გვერდზე დაბრუნება) |
-| **Plan For badge** | — | მარჯვენა (desktop) | results-ზე: ქალაქი, დრო, ტრანსპორტი |
-| **Back / Edit Preferences** | `header-nav-back` | მარჯვენა | `results` → `input`, `input` → `landing`, `loading` → `input` |
+**`SiteHeader`** — ყველა საჯარო გვერდზე:
+- GEOTRAVEL ლოგო → `/`
+- Desktop nav: Destinations, Experiences, Custom Routes, Blog, About
+- Mobile: burger მენიუ (slide-over)
+- Log In / Sign Up (ცალკე რეჟიმები AuthModal-ში)
+- Admin ბმული — მხოლოდ `role === "admin"`
+
+**`SiteFooter`** — landing, სიის გვერდები, დეტალური გვერდები
+
+**Shared კომპონენტები:**
+- `DestinationCard` — ბარათი + heart toggle + ბმული `/destinations/:id`
+- `formatPrice()` — `src/lib/format.ts` (`From $450`)
 
 ---
 
 ### 3. LandingPage — მთავარი გვერდი
 
-| ღილაკი | ID | ფუნქცია |
-|--------|-----|---------|
-| **Start Planning** | `cta-start-planning` | `onStart()` → `step = "input"` |
-
-**ვიზუალი:** headline, 3 feature card (Time Optimized, Zero Overwhelm, Offline-Ready Map) — მხოლოდ ინფორმაციული, ღილაკები არა.
-
----
-
-### 4. InputScreen — პარამეტრების ფორმა
-
-#### ველები და ლოგიკა
-
-| ველი | ტიპი | ლოგიკა |
-|------|------|--------|
-| **ქალაქი** | text input (`input-city`) | სავალდებულო; trim-ით გაგზავნა |
-| **სწრაფი ქალაქები** | ღილაკები | Tbilisi, Paris, Rome, Tokyo, New York — `setCity(c)` |
-| **დრო** | 4 ღილაკი | `2h` (120წთ), `4h` (240), `6h` (360), `1day` (480) |
-| **ტრანსპორტი** | 3 ღილაკი | `walk`, `car`, `mixed` |
-| **ინტერესები** | 4 toggle | `history`, `nature`, `food`, `mixed` |
-
-**ინტერესების toggle ლოგიკა (`handleInterestToggle`):**
-- `mixed` არჩევა → მხოლოდ `["mixed"]`
-- სხვა კატეგორია → `mixed` იშლება, toggle on/off
-- თუ ცარიელი დარჩა → ავტომატურად `["mixed"]`
-
-**Plan Preview:** live წინადადება — ქალაქი, დრო, ტრანსპორტი, ინტერესები.
-
-| ღილაკი | ID | ფუნქცია |
-|--------|-----|---------|
-| **Generate My Plan** | `btn-generate-plan` | form submit → `onSubmit(preferences)` |
-
----
-
-### 5. LoadingScreen — ჩატვირთვა
-
-**ღილაკები არ არის** — მხოლოდ ანიმაცია:
-- SVG მარშრუტის ხაზი
-- MapPin / Sparkles pin-ები
-- Loader2 spinner
-- progress bar (3.5 წმ)
-
----
-
-### 6. ResultsPage — შედეგები
-
-#### State
-- `selectedStopIndex` — არჩეული გაჩერება (default: 0)
-- `simplifyMode` — აღწერების დამალვა/ჩვენება
-- `isCopied` — clipboard copy სტატუსი (2 წმ)
-
-#### რუკის პანელი (მარცხენა 55%) — `RouteMap` (Mapbox)
-
 | ელემენტი | ფუნქცია |
 |----------|---------|
-| **Mapbox რუკა** | `streets-v12` სტილი, GPS კოორდინატებით |
-| **Marker ღილაკები** (1, 2, 3...) | `onStopSelect(idx)` — გაჩერების არჩევა |
-| **Route line** | stops-ს შორის ლურჯი LineString |
-| **NavigationControl** | zoom +/- (მარჯვენა ზედა) |
-| **flyTo** | არჩეულ stop-ზე გადასვლა |
-| **fitBounds** | ყველა stop-ის ჩარჩოში მოქცევა |
-| **Active Target badge** | მიმდინარე ქალაქი (overlay) |
-| **Stop info card** (ქვედა) | არჩეული stop: სახელი, აღწერა, duration |
-
-**Env:** `VITE_MAPBOX_ACCESS_TOKEN` — key-ის გარეშე placeholder ეკრანი
-
-#### იტინერარის პანელი (მარჯვენა 45%)
-
-| ღილაკი | ID | ფუნქცია |
-|--------|-----|---------|
-| **SlidersHorizontal** (header) | — | `onChangePreferences()` → `input` |
-| **Simplify Plan / Detailed Plan** | `btn-simplify-plan` | `simplifyMode` toggle — აღწერების hide/show |
-| **Copy plan text** | — | clipboard-ში stops ტექსტი (დრო, სახელი, duration, აღწერა) |
-| **Timeline item click** | — | `setSelectedStopIndex(index)` — pin-თან სინქრონიზაცია |
-| **Regenerate Plan** | `btn-regenerate-plan` | `onRegenerate()` — იგივე preferences-ით ახალი გეგმა |
-| **Change Preferences** | — | `onChangePreferences()` → `input` |
-
-**formatDuration:** ≥60 წთ → `Xh` / `X.Xh`, სხვა → `Xm`
+| **Search form** | city, date, guests, interests, transport → `onSearch(preferences)` |
+| **Features (4)** | ბმულები: `/destinations`, `/custom-routes`, `/experiences`, `/about` |
+| **Popular Destinations** | API-დან, **მხოლოდ 4** + View all |
+| **Newsletter** | `POST /api/public/newsletter` |
 
 ---
 
-### 7. Backend — სერვერი (`server.ts`)
+### 4. Backend — საჯარო API (`/api/public`)
+
+| Endpoint | აღწერა |
+|----------|--------|
+| `GET /destinations` | გამოქვეყნებული featured destinations |
+| `GET /destinations/:id` | ერთი destination |
+| `GET /blog` | გამოქვეყნებული პოსტები |
+| `GET /blog/:slug` | ერთი პოსტი |
+| `GET /packages` | travel packages (experiences) |
+| `GET /routes` | route templates (custom routes) |
+| `POST /newsletter` | email subscribe (validation only) |
+
+**Prisma მოდელები (CMS):**
+- `FeaturedDestination` — საჯარო destination ბარათები
+- `BlogPost` — ბლოგი slug-ით
+
+**Admin დამატებები (`/api/admin`):**
+- CRUD: `/destinations`, `/blog`
+- Places: ფილტრები, bulk delete/update
+- Scraper: TripAdvisor import
+
+---
+
+### 5. Auth განახლება
+
+- `GET /api/auth/me` — ულოგინოს აბრუნებს `200 { user: null }` (401-ის ნაცვლად)
+- refresh token-ით ავტომატური session restore `/me`-ზე
+- `AuthModal` — `initialMode: "login" | "register"` (Sign Up vs Log In)
+- `/api/auth/me` გამორიცხულია auto-refresh loop-დან (`api.ts`)
+
+---
+
+### 6. Admin CMS
+
+- ბრენდინგი: **GEOTRAVEL** (teal `#0B4A46`, VoyaAI-ის ნაცვლად)
+- ახალი მენიუ: Scraper, Destinations, Blog
+- კრედენშალები: `admin@voya.ai` / `Admin1234`
+
+---
+
+### 7. კონტენტი და seed
+
+**`npx tsx prisma/fix-content.ts`** — სურათების განახლება, blog თარიღები, packages/routes:
+- 10 FeaturedDestination (სწორი Unsplash URL-ები)
+- 10 BlogPost (სხვადასხვა თარიღი, სურათები)
+- 5 TravelPackage (experiences)
+- 4 RouteTemplate (custom routes)
+
+---
+
+### 8. InputScreen (წაშლილი)
+
+ძებნის ფორმა გადავიდა `LandingPage`-ზე. ძველი `input` ეტაპი აღარ არსებობს.
+
+---
+
+### 9. ResultsPage — შედეგები (განახლებული თემა)
+
+- RouteMap markers/line: teal `#0B4A46` (ლურჯის ნაცვლად)
+- Category badges: teal
+
+---
+
+### 10. Backend — სერვერი (`server.ts`) — დამატება
 
 | Endpoint | მეთოდი | ლოგიკა |
 |----------|--------|--------|
-| `/api/plan` | POST | `validatePlanRequest` → `generatePlanAsync` (AI ან fallback greedy) → JSON |
-| — | — | 400: არასწორი body; 500: engine შეცდომა |
-
-**Dev:** Vite middleware | **Production:** `dist/` static + SPA fallback
+| `/api/public/*` | GET/POST | საჯარო CMS კონტენტი |
+| `/api/plan` | POST | auth სავალდებულო — AI/greedy plan |
 
 ---
 
-### 8. Route Engine — მარშრუტის გენერაცია (`routeEngine.ts`)
+### 11. Route Engine — მარშრუტის გენერაცია (`routeEngine.ts`)
 
 #### შეყვანა (TravelPreferences)
 ```
@@ -370,6 +383,49 @@ TravelPlan.ai { provider, model, modelId, theme? }
 ---
 
 ## ჩანაწერები
+
+### [2026-06-30] — GEOTRAVEL საჯარო საიტი + აუდიტის ფიქსები
+
+**ტიპი:** დამატება + განახლება + გამოსწორება
+
+**აღწერა:**
+- სრული რებრენდინგი VoyaAI → **GEOTRAVEL** (teal `#0B4A46`)
+- საჯარო გვერდები: Destinations, Experiences, Custom Routes, Blog, About
+- ძებნა landing-ზე (`InputScreen` წაშლილი)
+- `FeaturedDestination` + `BlogPost` Prisma მოდელები და CMS
+- `/api/public` API + admin CRUD
+- TripAdvisor scraper admin-ში
+- Places admin: ფილტრები, bulk edit/delete
+- აუდიტის 25 პრობლემის გამოსწორება:
+  - სურათები (fix-content script)
+  - mobile burger menu
+  - `/blog/:slug`, `/destinations/:id` დეტალური გვერდები
+  - experiences (5 package) + custom routes (4 template) seed
+  - footer, newsletter API, heart toggle, feature links
+  - Sign Up vs Log In რეჟიმები
+  - plan state sessionStorage-ში
+  - plan error banner
+  - admin GEOTRAVEL teal branding
+  - index.html title, RouteMap/Results teal
+  - landing-ზე 4 destination + View all
+  - formatPrice (`From $450`)
+  - auth `/me` → `{ user: null }` ულოგინოს
+
+**ფაილები:**
+- `src/App.tsx`, `src/components/LandingPage.tsx`, `src/components/SiteHeader.tsx`, `src/components/SiteFooter.tsx`, `src/components/DestinationCard.tsx`
+- `src/pages/Public*.tsx`
+- `src/lib/format.ts`
+- `server/routes/public.ts`, `server/routes/admin.ts`, `server/routes/auth.ts`
+- `prisma/schema.prisma`, `prisma/fix-content.ts`
+- `server/lib/scraper/tripadvisor.ts`
+- `src/admin/pages/DestinationsPage.tsx`, `BlogPage.tsx`, `ScraperPage.tsx`, `PlacesPage.tsx`
+- `index.html`, `MEMORY.md`
+
+**კომენტარი:**
+- კონტენტის განახლება: `npx tsx prisma/fix-content.ts`
+- ენის ამრჩეველი დეკორატიულია (მხოლოდ EN ჩანს)
+
+---
 
 ### [2026-06-29] — AI მოდელების კატალოგის განახლება
 

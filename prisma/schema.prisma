@@ -253,3 +253,34 @@ model TravelPackage {
 
   @@map("travel_packages")
 }
+
+model FeaturedDestination {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  imageUrl    String   @map("image_url")
+  price       Float?
+  currency    String   @default("USD")
+  isTrending  Boolean  @default(false) @map("is_trending")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("featured_destinations")
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String
+  imageUrl    String?  @map("image_url")
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("blog_posts")
+}
+

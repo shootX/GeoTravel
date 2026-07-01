@@ -4,6 +4,8 @@ import { requireAdmin, requireAuth, requireCsrf } from "../lib/auth/middleware";
 import { refreshPlacesCache } from "../lib/cms/initializeCms";
 import { maskApiKey } from "../lib/ai/config";
 import { AI_PROVIDER_CATALOG } from "../lib/ai/catalog";
+import { scrapeTripAdvisor, suggestCategorySlug } from "../lib/scraper/tripadvisor";
+import type { ScraperField } from "../lib/scraper/types";
 
 const router = Router();
 
@@ -124,13 +126,73 @@ router.delete("/categories/:id", requireCsrf, async (req, res) => {
 // ── Places ──────────────────────────────────────────────────────────────────
 
 router.get("/places", async (req, res) => {
-  const city = typeof req.query.city === "string" ? req.query.city : undefined;
+  const city = typeof req.query.city === "string" ? req.query.city.trim() : "";
+  const categoryId = typeof req.query.categoryId === "string" ? req.query.categoryId.trim() : "";
+  const countryId = typeof req.query.countryId === "string" ? req.query.countryId.trim() : "";
+  const published = typeof req.query.published === "string" ? req.query.published : "";
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+  const where: {
+    city?: string;
+    categoryId?: string;
+    countryId?: string;
+    isPublished?: boolean;
+    OR?: Array<{ name?: { contains: string }; id?: { contains: string }; city?: { contains: string } }>;
+  } = {};
+
+  if (city) where.city = city;
+  if (categoryId) where.categoryId = categoryId;
+  if (countryId) where.countryId = countryId;
+  if (published === "true") where.isPublished = true;
+  if (published === "false") where.isPublished = false;
+  if (q) {
+    where.OR = [
+      { name: { contains: q } },
+      { id: { contains: q } },
+      { city: { contains: q } },
+    ];
+  }
+
   const places = await prisma.place.findMany({
-    where: city ? { city } : undefined,
+    where: Object.keys(where).length > 0 ? where : undefined,
     include: { country: true, category: true, hiddenGem: true, translations: true },
     orderBy: [{ city: "asc" }, { name: "asc" }],
   });
   res.json({ places });
+});
+
+router.post("/places/bulk-delete", requireCsrf, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ error: "ids array is required" });
+  }
+
+  const result = await prisma.place.deleteMany({ where: { id: { in: ids } } });
+  await invalidatePlaces();
+  res.json({ deleted: result.count });
+});
+
+router.put("/places/bulk-update", requireCsrf, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : [];
+  const patch = req.body?.patch ?? {};
+
+  if (ids.length === 0) {
+    return res.status(400).json({ error: "ids array is required" });
+  }
+
+  const data: Record<string, unknown> = {};
+  if (patch.city !== undefined) data.city = String(patch.city);
+  if (patch.countryId !== undefined) data.countryId = String(patch.countryId);
+  if (patch.categoryId !== undefined) data.categoryId = String(patch.categoryId);
+  if (patch.isPublished !== undefined) data.isPublished = !!patch.isPublished;
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: "patch must include at least one field" });
+  }
+
+  const result = await prisma.place.updateMany({ where: { id: { in: ids } }, data });
+  await invalidatePlaces();
+  res.json({ updated: result.count });
 });
 
 router.get("/places/:id", async (req, res) => {
@@ -631,4 +693,208 @@ router.delete("/ai/models/:id", requireCsrf, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── TripAdvisor Scraper ─────────────────────────────────────────────────────
+
+router.post("/scraper/tripadvisor", requireCsrf, async (req, res) => {
+  const body = req.body ?? {};
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  if (!url) {
+    return res.status(400).json({ error: "url is required" });
+  }
+
+  try {
+    const result = await scrapeTripAdvisor(url, {
+      fetchDetails: body.fetchDetails !== false,
+      maxItems: Number(body.maxItems) || 30,
+    });
+    res.json({
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        suggestedCategorySlug: suggestCategorySlug(item.category),
+      })),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Scrape failed";
+    return res.status(502).json({ error: message });
+  }
+});
+
+router.post("/scraper/tripadvisor/import", requireCsrf, async (req, res) => {
+  const body = req.body ?? {};
+  const items = Array.isArray(body.items) ? body.items : [];
+  const fields = new Set(
+    (Array.isArray(body.fields) ? body.fields : ["name", "description", "category", "location", "photo"]) as ScraperField[]
+  );
+
+  if (items.length === 0) {
+    return res.status(400).json({ error: "items array is required" });
+  }
+
+  const categories = await prisma.category.findMany();
+  const categoryBySlug = new Map(categories.map((c) => [c.slug, c.id]));
+  const defaultCategoryId = categoryBySlug.get("culture") ?? categories[0]?.id;
+
+  const created: string[] = [];
+  const skipped: string[] = [];
+  const errors: Array<{ id: string; error: string }> = [];
+
+  for (const raw of items) {
+    const id = String(raw.id ?? "");
+    if (!id) continue;
+
+    const existing = await prisma.place.findUnique({ where: { id } });
+    if (existing) {
+      skipped.push(id);
+      continue;
+    }
+
+    const countryCode = String(raw.countryCode ?? "GE").toUpperCase();
+    const country =
+      (await prisma.country.findUnique({ where: { code: countryCode } })) ??
+      (await prisma.country.findFirst({ where: { name: { contains: String(raw.country ?? "Georgia") } } }));
+
+    if (!country) {
+      errors.push({ id, error: `Country not found: ${countryCode}` });
+      continue;
+    }
+
+    const slug = String(raw.categorySlug ?? suggestCategorySlug(String(raw.category ?? "")));
+    const categoryId = categoryBySlug.get(slug) ?? defaultCategoryId;
+    if (!categoryId) {
+      errors.push({ id, error: "No categories in database" });
+      continue;
+    }
+
+    const tags: string[] = ["tripadvisor", `ta:${raw.tripadvisorId ?? id}`];
+    if (fields.has("photo") && raw.photoUrl) {
+      tags.push(`photo:${raw.photoUrl}`);
+    }
+
+    try {
+      await prisma.place.create({
+        data: {
+          id,
+          name: fields.has("name") ? String(raw.name ?? "Untitled") : id,
+          city: fields.has("location") ? String(raw.city ?? "Tbilisi") : "Tbilisi",
+          countryId: country.id,
+          categoryId,
+          lat: fields.has("location") ? Number(raw.lat) || 0 : 0,
+          lng: fields.has("location") ? Number(raw.lng) || 0 : 0,
+          description: fields.has("description") ? String(raw.description ?? "") : "",
+          shortDescription: fields.has("description") ? String(raw.description ?? "").slice(0, 280) : "",
+          fullDescription: fields.has("description") ? String(raw.description ?? "") : "",
+          popularityScore: raw.rating ? Math.round(Number(raw.rating) * 2) : 7,
+          photoScore: raw.photoUrl ? 8 : 7,
+          tags: JSON.stringify(tags),
+          isPublished: false,
+        },
+      });
+      created.push(id);
+    } catch (err) {
+      errors.push({ id, error: err instanceof Error ? err.message : "Create failed" });
+    }
+  }
+
+  if (created.length > 0) {
+    await invalidatePlaces();
+  }
+
+  res.json({ created, skipped, errors });
+});
+
+
+// ── Featured Destinations ───────────────────────────────────────────────────
+
+router.get("/destinations", async (req, res) => {
+  const destinations = await prisma.featuredDestination.findMany({
+    orderBy: { sortOrder: "asc" },
+  });
+  res.json({ destinations });
+});
+
+router.post("/destinations", requireCsrf, async (req, res) => {
+  const data = req.body;
+  const destination = await prisma.featuredDestination.create({
+    data: {
+      title: data.title,
+      subtitle: data.subtitle,
+      imageUrl: data.imageUrl,
+      price: data.price ? Number(data.price) : null,
+      currency: data.currency || "USD",
+      isTrending: !!data.isTrending,
+      isPublished: !!data.isPublished,
+      sortOrder: Number(data.sortOrder) || 0,
+    },
+  });
+  res.json({ destination });
+});
+
+router.put("/destinations/:id", requireCsrf, async (req, res) => {
+  const data = req.body;
+  const destination = await prisma.featuredDestination.update({
+    where: { id: req.params.id },
+    data: {
+      title: data.title,
+      subtitle: data.subtitle,
+      imageUrl: data.imageUrl,
+      price: data.price ? Number(data.price) : null,
+      currency: data.currency || "USD",
+      isTrending: !!data.isTrending,
+      isPublished: !!data.isPublished,
+      sortOrder: Number(data.sortOrder) || 0,
+    },
+  });
+  res.json({ destination });
+});
+
+router.delete("/destinations/:id", requireCsrf, async (req, res) => {
+  await prisma.featuredDestination.delete({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
+
+// ── Blog Posts ──────────────────────────────────────────────────────────────
+
+router.get("/blog", async (req, res) => {
+  const posts = await prisma.blogPost.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ posts });
+});
+
+router.post("/blog", requireCsrf, async (req, res) => {
+  const data = req.body;
+  const post = await prisma.blogPost.create({
+    data: {
+      title: data.title,
+      slug: data.slug,
+      excerpt: data.excerpt,
+      content: data.content,
+      imageUrl: data.imageUrl,
+      isPublished: !!data.isPublished,
+    },
+  });
+  res.json({ post });
+});
+
+router.put("/blog/:id", requireCsrf, async (req, res) => {
+  const data = req.body;
+  const post = await prisma.blogPost.update({
+    where: { id: req.params.id },
+    data: {
+      title: data.title,
+      slug: data.slug,
+      excerpt: data.excerpt,
+      content: data.content,
+      imageUrl: data.imageUrl,
+      isPublished: !!data.isPublished,
+    },
+  });
+  res.json({ post });
+});
+
+router.delete("/blog/:id", requireCsrf, async (req, res) => {
+  await prisma.blogPost.delete({ where: { id: req.params.id } });
+  res.json({ ok: true });
+});
 export default router;

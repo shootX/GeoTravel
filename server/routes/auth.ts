@@ -154,29 +154,37 @@ authRouter.post("/refresh", async (req: Request, res: Response) => {
 });
 
 authRouter.get("/me", async (req: Request, res: Response) => {
-  const token = req.cookies?.[ACCESS_COOKIE];
-  if (!token) {
-    res.status(401).json({ error: "Not authenticated" });
-    return;
+  const select = { id: true, email: true, name: true, avatarUrl: true, role: true } as const;
+
+  const accessToken = req.cookies?.[ACCESS_COOKIE];
+  if (accessToken) {
+    const payload = verifyAccessToken(accessToken);
+    if (payload) {
+      const user = await prisma.user.findUnique({ where: { id: payload.sub }, select });
+      if (user) {
+        res.json({ user: sanitizeUser(user) });
+        return;
+      }
+    }
   }
 
-  const payload = verifyAccessToken(token);
-  if (!payload) {
-    res.status(401).json({ error: "Invalid token" });
-    return;
+  const refreshToken = req.cookies?.[REFRESH_COOKIE];
+  if (refreshToken) {
+    const rotated = await rotateRefreshToken(refreshToken);
+    if (rotated) {
+      const user = await prisma.user.findUnique({ where: { id: rotated.userId }, select });
+      if (user) {
+        const newAccess = signAccessToken(user.id, user.email);
+        const csrfToken = generateCsrfToken();
+        setAuthCookies(res, newAccess, rotated.refreshToken, csrfToken);
+        res.json({ user: sanitizeUser(user) });
+        return;
+      }
+    }
+    clearAuthCookies(res);
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.sub },
-    select: { id: true, email: true, name: true, avatarUrl: true, role: true },
-  });
-
-  if (!user) {
-    res.status(401).json({ error: "User not found" });
-    return;
-  }
-
-  res.json({ user: sanitizeUser(user) });
+  res.json({ user: null });
 });
 
 authRouter.get("/google", (_req: Request, res: Response) => {

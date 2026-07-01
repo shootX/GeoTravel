@@ -78,15 +78,15 @@ export default function ResultsPage({
                 exit={{ opacity: 0, y: -15 }}
                 className="bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-white/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
               >
-                <div className="flex gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                    <Navigation className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                        STOP {selectedStopIndex + 1}
-                      </span>
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
+                      <Navigation className="w-5 h-5 text-[#0B4A46]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-[#0B4A46] bg-teal-50 px-2 py-0.5 rounded-md">
+                          STOP {selectedStopIndex + 1}
+                        </span>
                       <h4 className="font-display font-semibold text-sm text-gray-900">{activeStop.name}</h4>
                     </div>
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">{activeStop.description}</p>
@@ -133,7 +133,7 @@ export default function ResultsPage({
               onClick={() => setSimplifyMode(!simplifyMode)}
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-sans font-medium transition-all cursor-pointer ${
                 simplifyMode
-                  ? "bg-blue-50 text-blue-600 border border-blue-100"
+                  ? "bg-teal-50 text-[#0B4A46] border border-teal-100"
                   : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
               }`}
             >
@@ -163,7 +163,7 @@ export default function ResultsPage({
                 food: "bg-rose-50 text-rose-600 border-rose-100",
                 culture: "bg-purple-50 text-purple-600 border-purple-100",
                 viewpoint: "bg-sky-50 text-sky-600 border-sky-100",
-                mixed: "bg-blue-50 text-blue-600 border-blue-100",
+                mixed: "bg-teal-50 text-[#0B4A46] border-teal-100",
               };
               const badgeStyle = activityColors[stop.category] || activityColors.mixed;
 
@@ -176,14 +176,14 @@ export default function ResultsPage({
                   onClick={() => setSelectedStopIndex(index)}
                   className={`relative mb-8 last:mb-2 group transition-all p-3 rounded-xl border cursor-pointer ${
                     isActive
-                      ? "bg-blue-55/40 border-blue-200/50"
-                      : "bg-transparent border-transparent hover:bg-gray-55/40"
+                      ? "bg-teal-50/40 border-teal-200/50"
+                      : "bg-transparent border-transparent hover:bg-gray-50/40"
                   }`}
                 >
                   <div
                     className={`absolute -left-[24px] top-4 w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${
                       isActive
-                        ? "bg-blue-600 border-white scale-110 shadow-md ring-2 ring-blue-500/10"
+                        ? "bg-[#0B4A46] border-white scale-110 shadow-md ring-2 ring-teal-500/10"
                         : "bg-white border-gray-300 group-hover:border-gray-500"
                     }`}
                   >
@@ -205,7 +205,7 @@ export default function ResultsPage({
                     </span>
                   </div>
 
-                  <h3 className="font-display font-semibold text-base text-gray-900 group-hover:text-blue-600 transition-colors">
+                  <h3 className="font-display font-semibold text-base text-gray-900 group-hover:text-[#0B4A46] transition-colors">
                     {stop.name}
                   </h3>
 
@@ -230,7 +230,7 @@ export default function ResultsPage({
 
           <button
             onClick={onChangePreferences}
-            className="flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-sans font-semibold text-xs md:text-sm transition-all shadow-md shadow-blue-100 cursor-pointer"
+            className="flex items-center justify-center gap-2 py-3 px-4 bg-[#0B4A46] hover:bg-[#083a37] text-white rounded-xl font-sans font-semibold text-xs md:text-sm transition-all shadow-md shadow-teal-100 cursor-pointer"
           >
             <SlidersHorizontal className="w-4 h-4" />
             Change Preferences

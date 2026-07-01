@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Mail, Lock, User, LogIn, UserPlus } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -6,16 +6,21 @@ import { useAuth } from "../context/AuthContext";
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
+  initialMode?: "login" | "register";
 }
 
-export default function AuthModal({ open, onClose }: AuthModalProps) {
+export default function AuthModal({ open, onClose, initialMode = "login" }: AuthModalProps) {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -79,7 +84,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 onClick={() => switchMode("login")}
                 className={`py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                   mode === "login"
-                    ? "bg-neutral-900 text-white"
+                    ? "bg-[#0B4A46] text-white"
                     : "bg-neutral-50 text-neutral-600 hover:bg-neutral-100"
                 }`}
               >
@@ -91,7 +96,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 onClick={() => switchMode("register")}
                 className={`py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                   mode === "register"
-                    ? "bg-neutral-900 text-white"
+                    ? "bg-[#0B4A46] text-white"
                     : "bg-neutral-50 text-neutral-600 hover:bg-neutral-100"
                 }`}
               >
@@ -143,7 +148,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Name (optional)"
-                  className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-sky-500 focus:bg-white transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:bg-white transition-all"
                 />
               </div>
             )}
@@ -157,7 +162,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 placeholder="Email"
                 required
                 autoComplete="email"
-                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-sky-500 focus:bg-white transition-all"
+                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:bg-white transition-all"
               />
             </div>
 
@@ -171,7 +176,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
                 required
                 minLength={8}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-sky-500 focus:bg-white transition-all"
+                className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:border-teal-500 focus:bg-white transition-all"
               />
             </div>
 
@@ -184,7 +189,7 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer"
+              className="w-full py-3.5 bg-[#0B4A46] hover:bg-[#083a37] disabled:opacity-60 text-white font-semibold text-sm rounded-xl transition-colors cursor-pointer"
             >
               {submitting ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
             </button>

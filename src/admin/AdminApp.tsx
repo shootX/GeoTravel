@@ -10,6 +10,9 @@ import HiddenGemsPage from "./pages/HiddenGemsPage";
 import RouteTemplatesPage from "./pages/RouteTemplatesPage";
 import PackagesPage from "./pages/PackagesPage";
 import AiSettingsPage from "./pages/AiSettingsPage";
+import ScraperPage from "./pages/ScraperPage";
+import DestinationsPage from "./pages/DestinationsPage";
+import BlogPage from "./pages/BlogPage";
 
 export default function AdminApp() {
   return (
@@ -25,6 +28,9 @@ export default function AdminApp() {
         <Route path="route-templates" element={<RouteTemplatesPage />} />
         <Route path="packages" element={<PackagesPage />} />
         <Route path="ai" element={<AiSettingsPage />} />
+        <Route path="scraper" element={<ScraperPage />} />
+        <Route path="destinations" element={<DestinationsPage />} />
+        <Route path="blog" element={<BlogPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>
     </Routes>

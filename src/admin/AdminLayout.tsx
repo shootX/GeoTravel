@@ -16,6 +16,7 @@ import {
   Compass,
   Loader2,
   Sparkles,
+  Download,
 } from "lucide-react";
 
 const NAV = [
@@ -29,6 +30,9 @@ const NAV = [
   { to: "/admin/route-templates", label: "Route Templates", icon: Route },
   { to: "/admin/packages", label: "Packages", icon: Package },
   { to: "/admin/ai", label: "AI Planner", icon: Sparkles },
+  { to: "/admin/scraper", label: "Scraper", icon: Download },
+  { to: "/admin/destinations", label: "Destinations", icon: Globe },
+  { to: "/admin/blog", label: "Blog", icon: BookOpen },
 ];
 
 export default function AdminLayout() {
@@ -42,7 +46,7 @@ export default function AdminLayout() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#0B4A46]" />
       </div>
     );
   }
@@ -65,12 +69,12 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-[#F3F4F6] flex">
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div className="h-16 px-5 flex items-center gap-2 border-b border-gray-100">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-[#0B4A46] rounded-lg flex items-center justify-center">
             <Compass className="w-4 h-4 text-white" />
           </div>
           <div>
-            <div className="text-sm font-bold text-gray-900">VoyaAI CMS</div>
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider">Admin</div>
+            <div className="text-sm font-bold text-gray-900">GEOTRAVEL</div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider">Admin CMS</div>
           </div>
         </div>
 
@@ -82,7 +86,7 @@ export default function AdminLayout() {
               end={end}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                  isActive ? "bg-teal-50 text-[#0B4A46]" : "text-gray-600 hover:bg-gray-50"
                 }`
               }
             >

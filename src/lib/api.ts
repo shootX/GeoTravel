@@ -26,7 +26,12 @@ export async function apiFetch(input: RequestInfo, init: RequestInit = {}): Prom
     url.includes("/api/auth/register") ||
     url.includes("/api/auth/logout");
 
-  if (response.status === 401 && !url.includes("/api/auth/refresh") && !isAuthMutation) {
+  if (
+    response.status === 401 &&
+    !url.includes("/api/auth/refresh") &&
+    !url.includes("/api/auth/me") &&
+    !isAuthMutation
+  ) {
     const refreshed = await fetch("/api/auth/refresh", {
       method: "POST",
       credentials: "include",

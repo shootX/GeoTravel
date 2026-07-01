@@ -1,18 +1,32 @@
 import { useState, useEffect } from "react";
 import { TravelPreferences, TravelPlan } from "./types";
 import LandingPage from "./components/LandingPage";
-import InputScreen from "./components/InputScreen";
 import LoadingScreen from "./components/LoadingScreen";
 import ResultsPage from "./components/ResultsPage";
 import AuthModal from "./components/AuthModal";
+import SiteHeader from "./components/SiteHeader";
+import SiteFooter from "./components/SiteFooter";
 import { useAuth } from "./context/AuthContext";
 import { apiFetch } from "./lib/api";
-import { Compass, ArrowLeft, LogIn, LogOut } from "lucide-react";
+import { Routes, Route, useNavigate } from "react-router-dom";
+
+import PublicDestinationsPage from "./pages/PublicDestinationsPage";
+import PublicDestinationDetailPage from "./pages/PublicDestinationDetailPage";
+import PublicBlogPage from "./pages/PublicBlogPage";
+import PublicBlogPostPage from "./pages/PublicBlogPostPage";
+import PublicAboutPage from "./pages/PublicAboutPage";
+import PublicExperiencesPage from "./pages/PublicExperiencesPage";
+import PublicCustomRoutesPage from "./pages/PublicCustomRoutesPage";
+
+const PLAN_STATE_KEY = "geotravel_plan_state";
 
 export default function App() {
-  const { user, loading: authLoading, logout, refreshUser } = useAuth();
-  const [step, setStep] = useState<"landing" | "input" | "loading" | "results">("landing");
+  const { user, refreshUser } = useAuth();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<"landing" | "loading" | "results">("landing");
   const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [planError, setPlanError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<TravelPreferences>({
     city: "Tbilisi",
     timeLimit: "4h",
@@ -23,11 +37,37 @@ export default function App() {
   const [history, setHistory] = useState<TravelPlan[]>([]);
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(PLAN_STATE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          step?: typeof step;
+          plan?: TravelPlan;
+          prefs?: TravelPreferences;
+        };
+        if (saved.step) setStep(saved.step);
+        if (saved.plan) setGeneratedPlan(saved.plan);
+        if (saved.prefs) setPreferences(saved.prefs);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      PLAN_STATE_KEY,
+      JSON.stringify({ step, plan: generatedPlan, prefs: preferences })
+    );
+  }, [step, generatedPlan, preferences]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("auth") === "success") {
       refreshUser();
     }
     if (params.get("auth_error")) {
+      setAuthMode("login");
       setAuthOpen(true);
     }
   }, [refreshUser]);
@@ -36,22 +76,33 @@ export default function App() {
     if (!user) return;
     try {
       const cached = localStorage.getItem(`travel_planner_history_${user.id}`);
-      if (cached) {
-        setHistory(JSON.parse(cached));
-      }
+      if (cached) setHistory(JSON.parse(cached));
     } catch (e) {
       console.warn("Failed to load history:", e);
     }
   }, [user]);
 
+  const openLogin = () => {
+    setAuthMode("login");
+    setAuthOpen(true);
+  };
+
+  const openSignUp = () => {
+    setAuthMode("register");
+    setAuthOpen(true);
+  };
+
   const handlePreferencesSubmit = async (prefs: TravelPreferences) => {
     if (!user) {
+      setAuthMode("login");
       setAuthOpen(true);
       return;
     }
 
     setPreferences(prefs);
+    setPlanError(null);
     setStep("loading");
+    navigate("/");
 
     try {
       const response = await apiFetch("/api/plan", {
@@ -60,13 +111,15 @@ export default function App() {
       });
 
       if (response.status === 401) {
-        setStep("input");
+        setStep("landing");
+        setAuthMode("login");
         setAuthOpen(true);
         return;
       }
 
       if (!response.ok) {
-        throw new Error("Failed to call travel planner endpoint");
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Plan generation failed. Please try again.");
       }
 
       const plan: TravelPlan = await response.json();
@@ -78,7 +131,8 @@ export default function App() {
       localStorage.setItem(`travel_planner_history_${user.id}`, JSON.stringify(updatedHistory));
     } catch (err) {
       console.error("Plan generation failed:", err);
-      setStep("input");
+      setStep("landing");
+      setPlanError(err instanceof Error ? err.message : "Plan generation failed");
     }
   };
 
@@ -86,109 +140,104 @@ export default function App() {
     handlePreferencesSubmit(preferences);
   };
 
-  const handleStart = () => {
-    setStep("input");
+  const resetToLanding = () => {
+    setStep("landing");
+    setPlanError(null);
   };
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-[#111827] flex flex-col font-sans selection:bg-blue-100 selection:text-blue-800">
-      <header className="h-16 px-4 md:px-8 flex items-center justify-between bg-white border-b border-gray-100 shadow-sm z-30 shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setStep("landing")}
-            className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors"
-          >
-            <Compass className="w-5 h-5 text-white" />
-          </button>
-          <div>
-            <span className="font-display font-bold text-lg md:text-xl tracking-tight text-gray-900 block">
-              VoyaAI
-            </span>
-          </div>
-        </div>
+    <div className="min-h-screen bg-white text-[#111827] flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
+      <SiteHeader
+        onLogin={openLogin}
+        onSignUp={openSignUp}
+        onLogoClick={resetToLanding}
+      />
 
-        <div className="flex items-center gap-4">
-          {step === "results" && generatedPlan && (
-            <div className="hidden md:flex items-center bg-gray-50 rounded-full px-4 py-1.5 border border-gray-200">
-              <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider mr-2">Plan For:</span>
-              <span className="text-xs font-semibold text-gray-700">{generatedPlan.city}</span>
-              <div className="w-px h-3 bg-gray-300 mx-2" />
-              <span className="text-xs font-semibold text-gray-700 uppercase">{preferences.timeLimit}</span>
-              <div className="w-px h-3 bg-gray-300 mx-2" />
-              <span className="text-xs font-semibold text-gray-700 capitalize">{preferences.transport}</span>
-            </div>
-          )}
-
-          {!authLoading && (
-            user ? (
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2">
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="" className="w-7 h-7 rounded-full border border-gray-200" />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
-                      {(user.name || user.email)[0].toUpperCase()}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-gray-700 max-w-[120px] truncate">
-                    {user.name || user.email}
-                  </span>
-                </div>
-                <button
-                  onClick={() => logout()}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Logout</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setAuthOpen(true)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <LogIn className="w-4 h-4" />
-                Sign In
-              </button>
-            )
-          )}
-
-          {step !== "landing" && (
-            <button
-              id="header-nav-back"
-              onClick={() => {
-                if (step === "results") setStep("input");
-                else if (step === "input") setStep("landing");
-                else if (step === "loading") setStep("input");
-              }}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {step === "results" ? "Edit Preferences" : "Back"}
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        {step === "landing" && <LandingPage onStart={handleStart} />}
-
-        {step === "input" && (
-          <InputScreen onSubmit={handlePreferencesSubmit} initialPreferences={preferences} />
-        )}
-
-        {step === "loading" && <LoadingScreen />}
-
-        {step === "results" && generatedPlan && (
-          <ResultsPage
-            plan={generatedPlan}
-            onChangePreferences={() => setStep("input")}
-            onRegenerate={handleRegenerate}
+      <main className="flex-1 flex flex-col min-h-0 w-full">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                {step === "landing" && (
+                  <>
+                    {planError && (
+                      <div className="max-w-3xl mx-auto px-4 pt-4 w-full">
+                        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+                          {planError}
+                        </div>
+                      </div>
+                    )}
+                    <LandingPage onSearch={handlePreferencesSubmit} />
+                    <SiteFooter />
+                  </>
+                )}
+                {step === "loading" && <LoadingScreen />}
+                {step === "results" && generatedPlan && (
+                  <ResultsPage
+                    plan={generatedPlan}
+                    onChangePreferences={() => setStep("landing")}
+                    onRegenerate={handleRegenerate}
+                  />
+                )}
+              </>
+            }
           />
-        )}
+          <Route
+            path="/destinations"
+            element={
+              <>
+                <PublicDestinationsPage />
+                <SiteFooter />
+              </>
+            }
+          />
+          <Route path="/destinations/:id" element={<PublicDestinationDetailPage />} />
+          <Route
+            path="/experiences"
+            element={
+              <>
+                <PublicExperiencesPage />
+                <SiteFooter />
+              </>
+            }
+          />
+          <Route
+            path="/custom-routes"
+            element={
+              <>
+                <PublicCustomRoutesPage />
+                <SiteFooter />
+              </>
+            }
+          />
+          <Route
+            path="/blog"
+            element={
+              <>
+                <PublicBlogPage />
+                <SiteFooter />
+              </>
+            }
+          />
+          <Route path="/blog/:slug" element={<PublicBlogPostPage />} />
+          <Route
+            path="/about"
+            element={
+              <>
+                <PublicAboutPage />
+                <SiteFooter />
+              </>
+            }
+          />
+        </Routes>
       </main>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialMode={authMode}
+      />
     </div>
   );
 }
